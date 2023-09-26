@@ -23,8 +23,8 @@ turndownService.addRule('img', {
 })
 
 fs.readdirSync(noteFolder).forEach(fileName => {
-  // Skip directories which don't end in `.html` & `index.html` listing
-  if (fileName.indexOf('.html') !== fileName.length - 5 || fileName === 'index.html') {
+  // Skip directories which don't end in `.html` & `Evernote_index.html` listing
+  if (fileName.indexOf('.html') !== fileName.length - 5 || fileName === 'Evernote_index.html') {
     return;
   }
 
@@ -36,7 +36,7 @@ fs.readdirSync(noteFolder).forEach(fileName => {
   let createdDate = '';
   const metaTags = dom.window.document.getElementsByTagName('meta');
   for (let i = 0; i < metaTags.length; i++) {
-    if (metaTags[i].name === 'created') {
+    if (metaTags[i].getAttribute('itemprop') === 'created') {
       createdDate = metaTags[i].content;
       break;
     }
@@ -48,15 +48,26 @@ fs.readdirSync(noteFolder).forEach(fileName => {
     imgUrls.push('"' + noteFolder + decodeURIComponent(imgTags[i].src) + '"');
   }
 
-  const markdown = turndownService.turndown(contents).replace(/"/g, '\\"');
+  // Only takes into account the body of the Evernote export and prevents importing useless CSS
+  const markdown = turndownService.turndown(dom.window.document.body.innerHTML).replace(/"/g, '\\"');
   const urls = imgUrls.join(' ');
-  const isoDate = new Date(createdDate).toISOString().replace('.000', '');
+  
+  // Evernote already exports the date in ISO format but without the dashes and colons.
+  const isoDate = createdDate.slice(0,4) + '-' + 
+                  createdDate.slice(4,6) + '-' + 
+                  createdDate.slice(6,11) + ':' +
+                  createdDate.slice(11,13) + ':' +
+                  createdDate.slice(13);
 
   let execCommand = `dayone2 new "${markdown}"`;
   if (urls.length > 0) {
     execCommand += ` --photos ${urls}`;
   }
   execCommand += ` --isoDate "${isoDate}" --tags "EvernoteImport"`;
-
+  
+  // Uncomment the following if you want to save your imported entries in an existing journal
+  // const destination_journal = 'Evernote Imports';
+  // execCommand += ` --journal "${destination_journal}"`;
+  
   execSync(execCommand, console.log);
 });
